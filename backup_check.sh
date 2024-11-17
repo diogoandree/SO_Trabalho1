@@ -40,10 +40,13 @@ function recursive_check() {
             if [[ "$source_hash" != "$backup_hash" ]]; then
                 echo "$file and $backup_file differ."
             fi
+
         elif [[ -d "$file" && -d "$backup_file" ]]; then
             recursive_check "$file" "$backup_file"
+
         elif [[ -e "$file" && ! -e "$backup_file" ]]; then
             echo "File or directory $file is missing in backup."
+            
         elif [[ ! -e "$file" && -e "$backup_file" ]]; then
             echo "File or directory $backup_file is missing in source."
         fi

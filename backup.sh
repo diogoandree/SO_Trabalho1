@@ -38,7 +38,7 @@ shopt -s dotglob
 declare -A exclude_list
 if [[ -n "$tfile" && -f "$tfile" ]]; then
     while IFS= read -r line; do
-        exclude_list["$line"]=1
+        exclude_list["$line"]=1S
     done < "$tfile"
 fi
 
@@ -67,12 +67,19 @@ function recursive_backup() {
         local backup_file="$current_backup_dir/$filename"
 
         if [[ -f "$file" && ( -z "$regex" || "$filename" =~ $regex ) ]]; then
-            if [[ ! -e "$backup_file" || "$file" -nt "$backup_file" ]]; then
+            if [[ ! -e "$backup_file" ]]; then
                 echo "cp -a $file $backup_file"
                 if ! $check_flag; then
                     cp -a "$file" "$backup_file"
                 fi
+
+            elif [[ "$file" -nt "$backup_file" || $(cmp -s "$file" "$backup_file" || echo "different") == "different" ]]; then
+                if ! $check_flag; then
+                    echo "cp -a $file $backup_file"
+                    cp -a $file $backup_file
+                fi
             fi
+
 
         elif [[ -d "$file" ]]; then
             local has_matching_files=false

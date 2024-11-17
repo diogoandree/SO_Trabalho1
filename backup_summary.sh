@@ -92,24 +92,44 @@ function recursive_backup() {
 
         
         if [[ -f "$file" && ( -z "$regex" || "$filename" =~ $regex ) ]]; then
-            if [[ ! -e "$backup_file" || "$file" -nt "$backup_file" ]]; then
+            if [[ ! -e "$backup_file" ]]; then 
                 echo "cp -a $file $backup_file"
                 if ! $check_flag; then
                     cp -a "$file" "$backup_file" || { echo "Error copying file: $file"; local_errors=$((local_errors + 1)); continue; }
                     local_copied=$((local_copied + 1))
                     local_size_copied=$((local_size_copied + $(stat -c%s "$file")))
                 fi
+            elif [[ "$file" -nt "$backup_file" || $(cmp -s "$file" "$backup_file" || echo "different") == "different" ]]; then 
+                if ! $check_flag; then
+                    echo "cp -a $file $backup_file" 
+                    cp -a "$file" "$backup_file" || { echo "Error copying file: $file"; local_errors=$((local_errors + 1)); continue; }
+                    local_updated=$((local_updated + 1))
+                fi
             fi
-            if [[ -e "$backup_file" && "$file" -nt "$backup_file" ]]; then
-                local_updated=$((local_updated + 1))
-            elif [[ "$backup_file" -nt "$file" ]]; then
-                echo "WARNING: backup entry $backup_file is newer than $file"
+            
+            if [[ "$backup_file" -nt "$file" ]]; then
+                echo "WARNING: backup entry $backup_file is newer than $file; Should not happen"
                 local_warnings=$((local_warnings + 1))
             fi
 
         
         elif [[ -d "$file" ]]; then
-            recursive_backup "$file" "$backup_file"
+            local has_matching_files=false
+            if [[ -n "$regex" ]]; then
+                for subfile in "$file"/*; do
+                    local subfilename=$(basename "$subfile")
+                    if [[ -f "$subfile" && "$subfilename" =~ $regex ]]; then
+                        has_matching_files=true
+                        break
+                    fi
+                done
+            else
+                has_matching_files=true
+            fi 
+
+            if $has_matching_files; then
+                recursive_backup "$file" "$backup_file"
+            fi
         fi
     done
 
@@ -129,7 +149,7 @@ function recursive_backup() {
     done
 
     
-    echo "While backing up $current_source_dir: $local_errors Errors; $local_warnings Warnings; $local_updated Updated; $local_copied Copied ($local_size_copied B); $local_deleted Deleted ($local_size_deleted B)"
+    echo "While backuping $current_source_dir: $local_errors Errors; $local_warnings Warnings; $local_updated Updated; $local_copied Copied (${local_size_copied}B); $local_deleted Deleted (${local_size_deleted}B)"
     
     
     warnings=$((warnings + local_warnings))
